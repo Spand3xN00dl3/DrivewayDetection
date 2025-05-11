@@ -66,7 +66,7 @@ async def segmentImage(
         # print(x1, y1)
 
     draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill="red")
-    image.save("image.png", format="PNG")
+    # save_image(image, "image.png")
 
     input_points = np.array([[x, y]])
     input_labels = np.array([1])
@@ -95,7 +95,7 @@ async def segmentImage(
 
     # 6. Composite original image with mask overlay
     composite = Image.alpha_composite(image_rgba, overlay)
-    composite.save("composite_image.png", format="PNG")
+    # save_image(composite, "composite_image.png")
 
 
     # 7. Stream result back to frontend
@@ -108,3 +108,13 @@ async def segmentImage(
     # return StreamingResponse(buf, media_type="image/png")
     # return Response(content=composite, media_type="images/png")
     return { "message": "ok" }
+
+
+
+def save_image(image, filename, format="PNG"):
+    try:
+        image.save(f"images/{filename}", format=format)
+        return True
+    
+    except:
+        return False
