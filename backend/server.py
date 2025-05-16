@@ -8,11 +8,20 @@ import json
 import torch
 import torchvision
 import cv2
-
 from segment_anything import sam_model_registry, SamPredictor
 
-app = FastAPI()
+from dotenv import load_dotenv
+import os
+import requests
 
+
+
+
+load_dotenv()
+latest_mask = []
+
+
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,55 +43,66 @@ predictor = SamPredictor(sam)
 async def root():
     return { "message": "hello world"}
 
-@app.post("/segment")
+@app.post(
+        "/segment",
+        response={00: {"content": {"image/png": {}}}},
+        response_class=Response
+)
 async def segmentImage(
     file: UploadFile = File(...),
-    points: str = Form(None),
-    labels: str = Form(None)
+    points: str = Form(...),
+    labels: str = Form(...)
 ):
     contents = await file.read()
-
     image = Image.open(io.BytesIO(contents)).convert("RGB")
     draw = ImageDraw.Draw(image)
-
     image_np = np.array(image)
 
-    # nparr = np.frombuffer(contents, np.uint8)
-    # image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     predictor.set_image(image_np)
     h, w, _ = image_np.shape
 
     radius = 5
-    x = w // 2
-    y = h // 2
-    print(f"heights: {h}, width: {w}")
+    points = np.array(json.loads(points))
+    labels = np.array(json.loads(labels))
+    print(f"Points: {points}, Labels: {labels}")
 
-    if points and labels:
-        points = np.array(json.loads(points))
-        # x1, y1 = points[0]
-        x = points[0][0] * 3
-        y = points[0][1] * 3
-        # print(x1, y1)
+    for i in range(len(points)):
+        x = points[i][0]
+        y = points[i][1]
+        draw.ellipse((x-radius, y-radius, x+radius, y+radius), fill="blue" if labels[i] else "red")
+    
+    # save_image(image, "points.png")
 
-    draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill="red")
-    # save_image(image, "image.png")
+#     if points:
+#         return {"message": "ok"}
 
-    input_points = np.array([[x, y]])
-    input_labels = np.array([1])
+#     draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill="red")
+#     # save_image(image, "image.png")
+
+#     input_points = np.array([[x, y]])
+#     input_labels = np.array([1])
+
     masks, scores, logits = predictor.predict(
-        point_coords=input_points,
-        point_labels=input_labels,
+        point_coords=points,
+        point_labels=labels,
         multimask_output=True
     )
 
-    for i, (_, score) in enumerate(zip(masks, scores)):
+    for i, (mask, score) in enumerate(zip(masks, scores)):
         print(f"Mask No: {i}, Score: {score}, ")
+        mask = mask.astype(np.uint8) * 255
+        # print(mask)
+        create_composite(image, mask, f"composite{i}.png")
     
-    # print(masks[0])
-    mask = masks[0].astype(np.uint8) * 255
-    
+#     latest_mask = mask
+#     print("latest mask")
+#     print(latest_mask)
+
+#     return { "message": "ok" }
+
+def create_composite(image, mask, filename="composite_image.png"):
     # 4. Convert mask to RGBA overlay
+    h, w = mask.shape
     mask_image = Image.fromarray(mask).convert("L")  # L mode = grayscale
     color_mask = Image.new("RGBA", (w, h), (0, 255, 0, 100))  # Semi-transparent green
 
@@ -95,20 +115,15 @@ async def segmentImage(
 
     # 6. Composite original image with mask overlay
     composite = Image.alpha_composite(image_rgba, overlay)
-    # save_image(composite, "composite_image.png")
+    save_image(composite, filename)
 
 
-    # 7. Stream result back to frontend
-    # buf = io.BytesIO()
-    # composite.save(buf, format="PNG")
-    # buf.seek(0)
-    # print(composite)
-    # print(image)
-
-    # return StreamingResponse(buf, media_type="image/png")
-    # return Response(content=composite, media_type="images/png")
-    return { "message": "ok" }
-
+@app.post("/locate")
+async def locateDriveway(
+    address: str
+):
+    response = requests.post()
+    return {"message": "ok"}
 
 
 def save_image(image, filename, format="PNG"):
@@ -118,3 +133,29 @@ def save_image(image, filename, format="PNG"):
     
     except:
         return False
+
+
+def shoelace_formula(points):
+    if len(points) <= 2:
+        return 0
+
+    a1 = 0
+    a2 = 0
+
+    for i in range(len(points) - 1):
+        a1 += points[i][0] * points[i + 1][1]
+        a2 += points[i][1] * points[i + 1][0]
+    
+    a1 += points[-1][0] * points[0][1]
+    a2 += points[-1][1] * points[0][0]
+
+    return abs(a1 + a2) / 2.0
+
+
+# print("test")
+# points = [[0, 0], [1, 0], [1, 2], [0, 0]]
+# print(shoelace_formula(points))
+import uvicorn
+
+if __name__ == "__main__":
+    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
