@@ -184,7 +184,7 @@ function PointEditor() {
   };
 
   const sendImage = async () => {
-    if(points && imageURL) {
+    if(points.length > 0 && imageURL) {
       const formData = new FormData();
       formData.append("file", imageFile);
       formData.append("points", JSON.stringify(

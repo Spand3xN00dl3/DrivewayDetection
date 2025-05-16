@@ -44,9 +44,9 @@ async def root():
     return { "message": "hello world"}
 
 @app.post(
-        "/segment",
-        response={00: {"content": {"image/png": {}}}},
-        response_class=Response
+        "/segment"
+        # response={00: {"content": {"application/json": {}}}},
+        # response_class=Response
 )
 async def segmentImage(
     file: UploadFile = File(...),
@@ -70,29 +70,18 @@ async def segmentImage(
         x = points[i][0]
         y = points[i][1]
         draw.ellipse((x-radius, y-radius, x+radius, y+radius), fill="blue" if labels[i] else "red")
-    
-    # save_image(image, "points.png")
-
-#     if points:
-#         return {"message": "ok"}
-
-#     draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill="red")
-#     # save_image(image, "image.png")
-
-#     input_points = np.array([[x, y]])
-#     input_labels = np.array([1])
 
     masks, scores, logits = predictor.predict(
         point_coords=points,
         point_labels=labels,
         multimask_output=True
     )
+    print(masks.shape)
 
     for i, (mask, score) in enumerate(zip(masks, scores)):
         print(f"Mask No: {i}, Score: {score}, ")
-        mask = mask.astype(np.uint8) * 255
-        # print(mask)
-        create_composite(image, mask, f"composite{i}.png")
+        # mask = mask.astype(np.uint8) * 255
+        # create_composite(image, mask, f"composite{i}.png")
     
 #     latest_mask = mask
 #     print("latest mask")
@@ -101,19 +90,12 @@ async def segmentImage(
 #     return { "message": "ok" }
 
 def create_composite(image, mask, filename="composite_image.png"):
-    # 4. Convert mask to RGBA overlay
     h, w = mask.shape
     mask_image = Image.fromarray(mask).convert("L")  # L mode = grayscale
-    color_mask = Image.new("RGBA", (w, h), (0, 255, 0, 100))  # Semi-transparent green
-
-    # Paste color only where mask exists
+    color_mask = Image.new("RGBA", (w, h), (0, 255, 0, 100))
     overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     overlay.paste(color_mask, mask=mask_image)
-
-    # 5. Convert original to RGBA
     image_rgba = image.convert("RGBA")
-
-    # 6. Composite original image with mask overlay
     composite = Image.alpha_composite(image_rgba, overlay)
     save_image(composite, filename)
 
