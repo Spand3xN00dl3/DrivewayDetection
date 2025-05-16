@@ -44,9 +44,9 @@ async def root():
     return { "message": "hello world"}
 
 @app.post(
-        "/segment"
-        # response={00: {"content": {"application/json": {}}}},
-        # response_class=Response
+        "/segment",
+        responses={00: {"content": {"image/png": {}}}},
+        response_class=Response
 )
 async def segmentImage(
     file: UploadFile = File(...),
@@ -76,20 +76,26 @@ async def segmentImage(
         point_labels=labels,
         multimask_output=True
     )
-    print(masks.shape)
+
+    best_i = 0
 
     for i, (mask, score) in enumerate(zip(masks, scores)):
         print(f"Mask No: {i}, Score: {score}, ")
+
+        if scores[i] > scores[best_i]:
+            best_i = i
         # mask = mask.astype(np.uint8) * 255
-        # create_composite(image, mask, f"composite{i}.png")
+        # create_composite_image(image, mask, f"composite{i}.png")
     
-#     latest_mask = mask
-#     print("latest mask")
-#     print(latest_mask)
+    
+    buf = io.BytesIO()
+    mask = masks[best_i].astype(np.uint8) * 255
+    create_composite_image(image, mask).save(buf, format="PNG")
+    return Response(content=buf.getvalue(), media_type="image/png")
+    # return json.
 
-#     return { "message": "ok" }
 
-def create_composite(image, mask, filename="composite_image.png"):
+def create_composite_image(image, mask):
     h, w = mask.shape
     mask_image = Image.fromarray(mask).convert("L")  # L mode = grayscale
     color_mask = Image.new("RGBA", (w, h), (0, 255, 0, 100))
@@ -97,7 +103,7 @@ def create_composite(image, mask, filename="composite_image.png"):
     overlay.paste(color_mask, mask=mask_image)
     image_rgba = image.convert("RGBA")
     composite = Image.alpha_composite(image_rgba, overlay)
-    save_image(composite, filename)
+    return composite
 
 
 @app.post("/locate")

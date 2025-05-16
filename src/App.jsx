@@ -126,6 +126,7 @@ function PointEditor() {
   const [imageFile, setImageFile] = useState(null);
   const [imageURL, setImageURL] = useState(null);
   const [imgScale, setImgScale] = useState(null);
+  const [responseURL, setResponseURL] = useState(null);
 
   const imgRef = useRef(null);
 
@@ -192,13 +193,22 @@ function PointEditor() {
           [Math.round(pnt[0] * imgScale.x), Math.round(pnt[1] * imgScale.y)]
         ))));
       formData.append("labels", JSON.stringify(labels));
+
       const response = await fetch("http://0.0.0.0:8000/segment", {
         method: "POST",
-        mode: 'no-cors',
         body: formData
       });
+
+      // console.log(`response: ${response.}`);
+      console.log("recieved");
+      if(response.ok) {
+        console.log("response ok");
+        const blob = await response.blob();
+        setResponseURL(URL.createObjectURL(blob));
+      } else {
+        console.log(`not ok, status code: ${response.status}`);
+      }
     }
-    
 
     // if(!response.ok) {
     //   setText("did not work");
@@ -264,6 +274,7 @@ function PointEditor() {
               Send Image
             </button>
           </div>
+          {responseURL && <img src={responseURL} className='max-w-full' />}
         </div>
       </div>
     </div>
