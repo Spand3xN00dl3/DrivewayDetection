@@ -90,9 +90,21 @@ async def segmentImage(
     
     buf = io.BytesIO()
     mask = masks[best_i].astype(np.uint8) * 255
-    create_composite_image(image, mask).save(buf, format="PNG")
+    Image.fromarray(mask).convert("L").save(buf, format="PNG")
+    # composite_image = create_composite_image(image, mask)
+    # composite_image.save("images/composite_image.png", format="PNG")
+    # composite_image.save(buf, format="PNG")
     return Response(content=buf.getvalue(), media_type="image/png")
     # return json.
+
+
+@app.post("/calculateArea")
+async def calculateArea(mask: UploadFile = File(...), image: UploadFile = File(...)):
+    contents = await mask.read()
+    mask = np.array(Image.open(io.BytesIO(contents)))
+    contents = await image.read()
+    image = Image.open(io.BytesIO(contents)).convert("RGB")
+
 
 
 def create_composite_image(image, mask):
