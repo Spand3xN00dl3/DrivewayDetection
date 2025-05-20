@@ -45,7 +45,7 @@ async def root():
 
 @app.post(
         "/segment",
-        responses={00: {"content": {"image/png": {}}}},
+        responses={200: {"content": {"image/png": {}}}},
         response_class=Response
 )
 async def segmentImage(
@@ -99,12 +99,60 @@ async def segmentImage(
 
 
 @app.post("/calculateArea")
-async def calculateArea(mask: UploadFile = File(...), image: UploadFile = File(...)):
+async def calculateArea(
+    mask: UploadFile = File(...),
+    image: UploadFile = File(...)
+):
     contents = await mask.read()
     mask = np.array(Image.open(io.BytesIO(contents)))
     contents = await image.read()
     image = Image.open(io.BytesIO(contents)).convert("RGB")
 
+
+
+@app.post("/overlayTexture")
+async def overlayTexture(
+        mask: UploadFile = File(...),
+        image: UploadFile = File(...),
+        # material: str = Form(...)
+):
+    # get inputs
+    mask = np.array(Image.open(io.BytesIO(await mask.read())))
+    image = np.array(Image.open(io.BytesIO(await image.read())))
+    texture = np.array(Image.open('textures/brick_diffuse.jpg').convert('RGB'))
+
+    shape = image.shape
+    print(f"shape: ${shape}")
+
+    # scale texture
+    scale = 0.075
+    texture_tile = cv2.resize(texture, (0, 0), fx=scale, fy=scale)
+    texture = tile_texture_to_shape(texture_tile, shape)
+
+    # create overlay
+    mask = cv2.merge([mask] * 3)
+    driveway_texture = cv2.bitwise_and(texture, mask)
+    inverse_mask = cv2.bitwise_not(mask)
+    background = cv2.bitwise_and(image, inverse_mask)
+    texture_overlay_image = cv2.add(background, driveway_texture)
+    # Image.fromarray(texture_overlay_image).save('images/texture_overlay_image.png', format="PNG")
+
+    # blend overlay
+    alpha = 0.8
+    blended_overlay = cv2.addWeighted(image, 1 - alpha, texture_overlay_image, alpha, 0)
+    Image.fromarray(blended_overlay).save('images/blended_overlay.png', format="PNG")
+    return {"message": "ok"}
+
+
+def tile_texture_to_shape(texture_tile, shape):
+    tile_h, tile_w = texture_tile.shape[:2]
+    target_h, target_w = shape[:2]
+    
+    reps_y = int(np.ceil(target_h / tile_h))
+    reps_x = int(np.ceil(target_w / tile_w))
+    
+    tiled = np.tile(texture_tile, (reps_y, reps_x, 1))
+    return tiled[:target_h, :target_w]
 
 
 def create_composite_image(image, mask):
@@ -150,6 +198,8 @@ def shoelace_formula(points):
     a2 += points[-1][1] * points[0][0]
 
     return abs(a1 + a2) / 2.0
+
+
 
 
 # print("test")

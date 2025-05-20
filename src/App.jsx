@@ -16,6 +16,7 @@ function PointEditor() {
   const [imageURL, setImageURL] = useState(null);
   const [imgScale, setImgScale] = useState(null);
   const [responseURL, setResponseURL] = useState(null);
+  const [maskImage, setMaskImage] = useState(null);
 
   const imgRef = useRef(null);
 
@@ -93,18 +94,27 @@ function PointEditor() {
       if(response.ok) {
         console.log("response ok");
         const blob = await response.blob();
+        setMaskImage(blob);
         setResponseURL(URL.createObjectURL(blob));
+
       } else {
         console.log(`not ok, status code: ${response.status}`);
       }
     }
+  };
 
-    // if(!response.ok) {
-    //   setText("did not work");
-    // }
+  const getOverlay = async () => {
+    const formData = new FormData();
+    formData.append('mask', maskImage);
+    formData.append('image', imageFile);
+    console.log('sending request');
 
-    // const blob = await response.blob();
-    // setSegmentedURL(URL.createObjectURL(blob));
+    const response = await fetch("http://0.0.0.0:8000/overlayTexture", {
+      method: "POST",
+      body: formData
+    });
+    
+    console.log('recieved response');
   };
 
   let bgColor = exclude ? 'bg-stone-400' : 'bg-stone-300';
@@ -125,9 +135,7 @@ function PointEditor() {
         </div>
       </div>
       <div className='w-1/5 bg-gray-200 border-l-2 border-slate-600 flex flex-col items-center gap-[10px]'>
-        <div className='relative h-20 w-full'>
-
-        </div>
+        <div className='relative h-20 w-full' />
         <button
           onClick={undo}
           className='w-2/3'
@@ -143,24 +151,24 @@ function PointEditor() {
           </p>
         </div>
         <div className='h-full w-full flex flex-col-reverse'>
-          <div className='h-1/3 w-full bg-blue-200 self-center flex flex-col items-center justify-center gap-10'>
-            {/* <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              className="mb-4"
-            /> */}
+          <div className='h-1/3 w-full bg-blue-200 self-center flex flex-col items-center justify-center gap-5'>
             <input
               type="file"
               accept="image/*"
               onChange={showImage}
-              className="w-full"
+              className="w-5/6"
             />
             <button
               onClick={sendImage}
               className='w-2/3'
             >
               Send Image
+            </button>
+            <button
+              onClick={getOverlay}
+              className='w-2/3'
+            >
+              Get Overlay
             </button>
           </div>
           {responseURL && <img src={responseURL} className='max-w-full' />}
